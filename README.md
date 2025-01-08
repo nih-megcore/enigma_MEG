@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/294786606.svg)](https://doi.org/10.5281/zenodo.14616848)
 # Installation
 
 Setup Conda Environment:
