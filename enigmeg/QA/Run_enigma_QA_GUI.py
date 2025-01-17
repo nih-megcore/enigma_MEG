@@ -19,7 +19,7 @@ PROJECT = 'ENIGMA_MEG_QA'
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-bids_root', help='''Location of bids directory, default=bids_out''')
-    parser.add_argument('-QAtype', help='''QA type to run. Options are 'coreg', 'ica', 'bem','src','surf','spectra','beamformer''')
+    parser.add_argument('-QAtype', help='''QA type to run. Options are 'coreg', 'ica', 'bem','src','surf','spectra','alpha''')
     parser.add_argument('-rows', help='''number of rows in QA browser, default=4''')
     parser.add_argument('-columns', help='''number of columns in QA browser, default=2''')
     parser.add_argument('-imgsize', help='''make images smaller or larger, default=200''')
@@ -44,8 +44,8 @@ def main():
         parser.print_help()
         raise ValueError('You must choose a QA type')
     else:
-        if args.QAtype not in ['coreg','ica','surf','bem','src','spectra','beamformer','cleaned']:
-            raise ValueError("QAtype not valid, must be one of 'coreg', 'ica','surf','bem','src','spectra','beamformer','cleaned'")
+        if args.QAtype not in ['coreg','ica','surf','bem','src','spectra','alpha','cleaned']:
+            raise ValueError("QAtype not valid, must be one of 'coreg', 'ica','surf','bem','src','spectra','alpha','cleaned'")
         QAtype = args.QAtype
     
     if QAtype == 'coreg' or QAtype == 'bem' or QAtype == 'src' or QAtype == 'ica':
@@ -56,7 +56,7 @@ def main():
         column_default = 2
         row_default = 3
         size_default = 300
-    elif QAtype == 'spectra' or QAtype == 'beamformer' or QAtype == 'cleaned':
+    elif QAtype == 'spectra' or QAtype == 'alpha' or QAtype == 'cleaned':
         column_default = 3
         row_default = 3
         size_default = 300   
