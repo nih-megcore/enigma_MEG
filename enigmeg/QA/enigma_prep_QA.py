@@ -8,6 +8,7 @@ Created on Mon Mar 20 14:39:25 2023
 
 import os, os.path as op
 import argparse
+import enigmeg
 from enigmeg.process_meg import process
 from enigmeg.QA.enigma_QA_functions import gen_coreg_pngs, gen_bem_pngs, gen_src_pngs, gen_surf_pngs
 from enigmeg.QA.enigma_QA_functions import gen_epo_pngs, gen_fooof_pngs
@@ -118,8 +119,14 @@ def main():
             print(row)
             
             subjid=row['sub']
-            session=str(row['ses'])
-            run=str(row['run'])
+            if pd.isna(row['ses']):
+                session=None
+            else:
+                session=str(row['ses'])
+            if pd.isna(row['run']):
+                run=None
+            else:
+                run=str(row['run'])
             args.rest_tag = row['path'].split('task-')[1].split('_')[0]
             try:
                 args.emptyroom_tag = row['eroom'].split('task-')[1].split('_')[0]
