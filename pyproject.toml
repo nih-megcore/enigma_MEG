@@ -36,6 +36,8 @@ testing = ['datalad','pytest','pygit2', 'pytest-cov']
 "enigma_prep_QA.py" = 'enigmeg.QA.enigma_prep_QA:main'
 "Run_enigma_QA_GUI.py" = 'enigmeg.QA.Run_enigma_QA_GUI:main'
 "parse_bids.py" =  'enigmeg.parse_bids:main'
+"enigma_QA_spectrapsd.py" = 'enigmeg.QA.enigma_QA_spectrapsd:main'
+"enigma_prep_QA_hcp.py" = 'enigmeg.QA.enigma_prep_QA_hcp:main'
 
 
 [tool.setuptools.packages.find]
