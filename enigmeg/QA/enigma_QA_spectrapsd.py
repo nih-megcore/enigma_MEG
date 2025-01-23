@@ -53,9 +53,10 @@ def main():
         df = pd.read_csv(file)
         # drop the "unknown-lh" and "unknown-rh" parcels
         df = df.drop([225,449])
+        x=df.columns.astype(float).values
         
         fig, ax = plt.subplots()
-        ax.plot(df.values.T)
+        ax.plot(x, df.values.T)
         
         fig.savefig(QA_file, dpi=300, bbox_inches='tight')
         plt.close(fig)

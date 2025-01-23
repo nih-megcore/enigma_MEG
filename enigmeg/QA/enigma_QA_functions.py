@@ -27,7 +27,7 @@ def gen_coreg_pngs(subjstruct):
    
     fig = mne.viz.plot_alignment(info=subjstruct.raw_rest.info, trans=subjstruct.trans, subject='sub-'+subjid, 
                                  subjects_dir=subjstruct.subjects_dir)
-    set_3d_view(fig,**views_dicts['both']['frontal'])
+    set_3d_view(fig,**views_dicts['both']['rostral'])
     img1=fig.plotter.screenshot()
     fig.plotter.close()
     fig = mne.viz.plot_alignment(info=subjstruct.raw_rest.info, trans=subjstruct.trans, subject='sub-'+subjid, 
