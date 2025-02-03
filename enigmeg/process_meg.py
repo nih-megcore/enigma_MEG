@@ -874,8 +874,9 @@ class process():
                                          subjects_dir=self.subjects_dir, 
                                          fiducials='estimated')
         coreg.fit_fiducials(verbose=True)
-        coreg.omit_head_shape_points(distance=5. / 1000)  # distance is in meters
-        coreg.fit_icp(n_iterations=6, nasion_weight=.5, hsp_weight= 5, verbose=True)
+        coreg.omit_head_shape_points(distance=15. / 1000)  # distance is in meters
+        # use default parameters for the icp fit
+        coreg.fit_icp(verbose=True)
         return coreg.trans
             
     # make the parcellation and subparcellation
