@@ -14,7 +14,7 @@ os.chdir(topdir)
 import pandas as pd
 
 # =============================================================================
-# Get age/gender from participants.tsv
+# Get age/sex from participants.tsv
 # Download the all_demographics folder from biowulf enigma/bids/all_demographics
 # =============================================================================
 # demo_dir = '/tmp/all_demographics'
@@ -136,7 +136,7 @@ all_dat.loc[hv_m_idx,'sex']='M'
 all_dat.loc[hv_f_idx,'sex']='F'
 
 
-#Use single letter for gender
+#Use single letter for sex 
 all_dat.sex.dropna(inplace=True)
 all_dat.drop(index=all_dat[all_dat.sex==-999].index, inplace=True)
 all_dat['sex']=all_dat['sex'].str[0].apply(str.upper)
