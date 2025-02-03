@@ -103,7 +103,7 @@ def filter_parcel_data(dframe, parcel_name=None, column_name=None):
     '''Return single parcel information for stats testing'''
     tmp=dframe[dframe.Parcel==parcel_name]
     return tmp[[column_name, 'age', 'SEX']].dropna()
-    # return tmp[[column_name, 'age', 'gender_text']].dropna()
+    # return tmp[[column_name, 'age', 'sex_text']].dropna()
 
 
 def proc_parcel_regression(dframe):
