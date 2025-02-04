@@ -75,9 +75,26 @@ def do_auto_coreg(raw_fname, subject, subjects_dir):
                                      subjects_dir=subjects_dir, 
                                      fiducials='estimated')
     coreg.fit_fiducials(verbose=True)
-    coreg.omit_head_shape_points(distance=5. / 1000)  # distance is in meters
-    coreg.fit_icp(n_iterations=6, nasion_weight=.5, hsp_weight= 5, verbose=True)
+    coreg.omit_head_shape_points(distance=15. / 1000)  # distance is in meters
+    coreg.fit_icp(verbose=True) #n_iterations=20, nasion_weight=10, hsp_weight= 1, verbose=True)
     return coreg.trans
+
+def get_transfile(meg_fname):
+    meg_dir = op.dirname(op.dirname(meg_fname))
+    trans_all = glob.glob(op.join(meg_dir, '*trans.fif'))
+    if len(trans_all) == 0:
+        return None
+    elif len(trans_all) > 1:
+        curr = mne.read_trans(trans_all[0])
+        for i in trans_all[1:]:
+            tmp_ = mne.read_trans(i)
+            if tmp_ != curr:
+                return 'Multiple'
+        return trans_all[0]
+    else:
+        return trans_all[0]
+    
+    
     
 
 dsets = glob.glob(op.join(topdir, 'HCP*','unprocessed','MEG','*','*raw.fif'))
@@ -89,6 +106,7 @@ dframe['task']= dframe.fname.apply(get_dset_info, **{'return_type':'task'})
 dframe['run']= dframe.fname.apply(get_dset_info, **{'return_type':'run'})
 dframe['subjects_dir']=topdir + '/' +  dframe.subjid  + '/T1w'
 dframe['session'] = '1'
+dframe['transfile'] = dframe.fname.apply(get_transfile)
 
 for idx, row in dframe.iterrows():
     if row.subjid[-2:] == 'V2':
@@ -99,6 +117,9 @@ csv_outfname = op.join(logdir, 'dframe.csv')
 if op.exists(csv_outfname):
     os.remove(csv_outfname)
 dframe.to_csv(op.join(logdir, 'dframe.csv'))
+
+manual_check = dframe[dframe['transfile']=='Multiple']
+dframe = dframe[dframe['transfile']!='Multiple']
     
 # =============================================================================
 #  Make Transform from automated fit

@@ -62,8 +62,8 @@ def do_auto_coreg(raw_fname, subject, subjects_dir):
                                      subjects_dir=subjects_dir, 
                                      fiducials='estimated')
     coreg.fit_fiducials(verbose=True)
-    coreg.omit_head_shape_points(distance=5. / 1000)  # distance is in meters
-    coreg.fit_icp(n_iterations=6, nasion_weight=.5, hsp_weight= 5, verbose=True)
+    coreg.omit_head_shape_points(distance=15. / 1000)  # distance is in meters
+    coreg.fit_icp(verbose=True)
     return coreg.trans
 
 def get_transfile(meg_fname):
@@ -90,7 +90,7 @@ dframe = pd.DataFrame(zip(dsets,subjids), columns=['fname','subjid'])
 
 dframe['task']= dframe.fname.apply(get_dset_info, **{'return_type':'task'})
 dframe['run']= dframe.fname.apply(get_dset_info, **{'return_type':'run'})
-dframe['subjects_dir']=op.join(topdir, 'derivatives','freesurfer','subjects') 
+dframe['subjects_dir']=op.join(topdir, 'BIDS','derivatives','freesurfer','subjects') 
 dframe['session'] = '1'
 dframe['transfile'] = dframe.fname.apply(get_transfile)
 
