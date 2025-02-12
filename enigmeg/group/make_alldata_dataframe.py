@@ -187,12 +187,12 @@ if __name__=='__main__':
     print('Total eyesclosed control datasets with no repeat runs %d' % (len(controls_powermegaframe_norepeats[controls_powermegaframe_norepeats['task']=='eyesclosed'])/448))
       
     controls_powermegaframe_all.to_csv('Controls_Power_dataframe_all.csv')
-    controls_powermegaframe_all.to_csv('Controls_Spectra_dataframe_all.csv')
-    controls_powermegaframe_all.to_csv('Controls_Extra_dataframe_all.csv')
+    controls_spectramegaframe_all.to_csv('Controls_Spectra_dataframe_all.csv')
+    controls_extramegaframe_all.to_csv('Controls_Extra_dataframe_all.csv')
     
     controls_powermegaframe_norepeats.to_csv('Controls_Power_dataframe_norepeats.csv')
-    controls_powermegaframe_norepeats.to_csv('Controls_Spectra_dataframe_norepeats.csv')
-    controls_powermegaframe_norepeats.to_csv('Controls_Extra_dataframe_norepeats.csv')   
+    controls_spectramegaframe_norepeats.to_csv('Controls_Spectra_dataframe_norepeats.csv')
+    controls_extramegaframe_norepeats.to_csv('Controls_Extra_dataframe_norepeats.csv')   
     
     powermegaframe_all.to_csv('Power_dataframe_all.csv')
     spectramegaframe_all.to_csv('Spectra_dataframe_all.csv')

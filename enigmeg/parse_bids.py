@@ -352,6 +352,7 @@ def main():
                                 if not os.path.islink(bids_path_out.fpath):
                                   print('making a symbolic link to make a same session MRI')
                                   os.symlink(bids_path_orig.fpath, bids_path_out.fpath)
+                            proc_object.task = tmp_ents['task']
                                            
                 subrestlist.extend(subrestlist_ses)
        
