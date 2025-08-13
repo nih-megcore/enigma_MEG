@@ -8,44 +8,10 @@ Created on Mon May  6 09:21:19 2024
 
 import pandas as pd
 import numpy as np
-import scipy as sp
-import scipy.stats as stats
-import neuroCovHarmonize
-from neuroCovHarmonize.harmonizationLearn import harmonizationCovLearn, saveHarmonizationModel, saveHarmonizationModelNeuroCombat
 import neuroHarmonize
-from neuroHarmonize import harmonizationLearn
-import statsmodels.api as sm
-from statsmodels.formula.api import ols
-from sklearn.preprocessing import PolynomialFeatures
-import statsmodels.formula.api as smf
-from neuroCombat.neuroCombat import neuroCombat
+from neuroHarmonize import harmonizationLearn, saveHarmonizationModel, harmonizationApply
 
-reliefSource = '/home/nugenta/src/RELIEF.R'
-import rpy2
-import rpy2.robjects as robjects
-from rpy2.robjects.packages import importr
-from rpy2.robjects.vectors import StrVector
-import rpy2.robjects.packages as rpackages
-
-import rpy2.robjects.numpy2ri
-rpy2.robjects.numpy2ri.activate()
-
-## import R packages
-base = importr('base')
-utils = importr('utils')
-
-denoiseR = importr('denoiseR')
-MASS = importr('MASS')
-Matrix = importr('Matrix')
-
-## source the RELIEF functions from local .R file
-r = robjects.r
-r.source(reliefSource)   ## path to the local file
-
-## bring the function into python
-relief = robjects.globalenv['relief']
-# print(relief.r_repr())
-
+        
 def combine_columns(df):
     
     bankssts_lh = df.filter(regex='^bankssts.*-lh$').mean(axis=1)
@@ -223,81 +189,158 @@ def combine_columns(df):
 
 def make_power_dataframes(dataframe):
     
-    delta = dataframe.pivot(index=['subject','task'], columns='Parcel', values='[1, 3]').reset_index()
-    theta = dataframe.pivot(index=['subject','task'], columns='Parcel', values='[3, 6]').reset_index()
-    alpha = dataframe.pivot(index=['subject','task'], columns='Parcel', values='[8, 12]').reset_index()
-    beta = dataframe.pivot(index=['subject','task'], columns='Parcel', values='[13, 35]').reset_index()
-    gamma = dataframe.pivot(index=['subject','task'], columns='Parcel', values='[35, 45]').reset_index()
+    delta = dataframe.pivot(index=['subject','task'], columns='Parcel', values='[1, 3]').sort_index().reset_index()
+    theta = dataframe.pivot(index=['subject','task'], columns='Parcel', values='[3, 6]').sort_index().reset_index()
+    alpha = dataframe.pivot(index=['subject','task'], columns='Parcel', values='[8, 12]').sort_index().reset_index()
+    beta = dataframe.pivot(index=['subject','task'], columns='Parcel', values='[13, 35]').sort_index().reset_index()
+    gamma = dataframe.pivot(index=['subject','task'], columns='Parcel', values='[35, 45]').sort_index().reset_index()
+    aperoffset = dataframe.pivot(index=['subject','task'], columns='Parcel', values='AperiodicOffset').sort_index().reset_index()
+    aperexp = dataframe.pivot(index=['subject','task'], columns='Parcel', values='AperiodicExponent').sort_index().reset_index()
     
-    delta = delta.drop(columns='task')
-    theta = theta.drop(columns='task')
-    alpha = alpha.drop(columns='task')
-    beta = beta.drop(columns='task')
-    gamma = gamma.drop(columns='task')
-    
-    return delta, theta, alpha, beta, gamma
+    return delta, theta, alpha, beta, gamma, aperoffset, aperexp
+
 
 def prepare_to_harmonize(dataframe, single, num_parcels):
     
-    dataframe['age'] = single['age']
-    dataframe['sex'] = single['sex']
-    dataframe['site'] = single['site']
-    dataframe['task'] = single['task']
-    dataframe['study'] = single['study']
+    dataframe=pd.merge(
+        dataframe.drop(columns=['age','sex','site','study'], errors='ignore'),
+        single[['subject', 'task', 'age', 'sex', 'site', 'study']],
+        on=['subject', 'task'],
+        how='left'
+    )
     
-    data_to_harmonize = dataframe.iloc[:, 1:(num_parcels+1)].to_numpy()
+    parcel_cols = [col for col in dataframe.columns if col not in ['subject', 'task','age','sex','site','study']]
+    data_to_harmonize = dataframe[parcel_cols].to_numpy()
     
-    # also add age bins for later
-    age_bins = [0, 20, 40, 60, 120]  # 0-20, 20-40, 40-60, 60-80
-    age_labels = ['0-20', '20-40', '40-60', '60up']
+    return dataframe, data_to_harmonize, parcel_cols
 
-    # Create a new column with the age bins
-    dataframe['age_group'] = pd.cut(dataframe['age'], bins=age_bins, labels=age_labels, right=False)
-    
-    return dataframe, data_to_harmonize
-
-def process_adjusted(data, tmpidx, single, num_parcels):
+def process_adjusted(data, parcel_cols, single, num_parcels):
         
-    data_dframe = pd.DataFrame(data, columns=tmpidx[1:(num_parcels+1)])
-    data_dframe['subject'] = single['subject']
-    data_dframe['age'] = single['age']
-    data_dframe['sex'] = single['sex']
-    data_dframe['site'] = single['site']
-    data_dframe['task'] = single['task']
-    data_dframe['study'] = single['study']
-        
-    # add age bins
-    age_bins = [0, 20, 40, 60, 120]  # 0-20, 20-40, 40-60, 60-80
-    age_labels = ['0-20', '20-40', '40-60', '60up']
-
-    # Create a new column with the age bins
-    data_dframe['age_group'] = pd.cut(data_dframe['age'], bins=age_bins, labels=age_labels, right=False)
+    data_dframe = pd.DataFrame(data, columns=parcel_cols)
+    data_dframe['subject'] = single['subject'].values
+    data_dframe['age'] = single['age'].values
+    data_dframe['sex'] = single['sex'].values
+    data_dframe['site'] = single['site'].values
+    data_dframe['task'] = single['task'].values
+    data_dframe['study'] = single['study'].values
 
     return data_dframe
 
-def process_adjusted_covbat(data, tmpidx, single, num_parcels):
+def harmonize(filename, do_subparc, harm_task, prefix, groupbyvar, band):
     
-    dataframes = []    
-    numframes = np.shape(data)[2]
+    if do_subparc == True:
+        num_parcels = 448
+    else:
+        num_parcels = 68
+     
+    dataframe = pd.read_csv(filename)
     
-    # add age bins
-    age_bins = [0, 20, 40, 60, 120]  # 0-20, 20-40, 40-60, 60-80
-    age_labels = ['0-20', '20-40', '40-60', '60up']
+    print('Dataframe read, number of subjects is %d' % (int(len(dataframe)/448)))
+ 
+    dataframe = dataframe.dropna(subset=['age'])
+    dataframe = dataframe[dataframe['sex'].isin(['M','F'])]
     
-    for i in range(numframes):
+    print('Age NaN and sex N values dropped, number of subjects is %d' % (int(len(dataframe)/448)), flush=True)
+ 
+    # extract column headings 
+    dataframe['study'] = dataframe['study'].astype('category')
+    dataframe['site'] = dataframe['site'].astype('category')  
+    dataframe['sex'] = dataframe['sex'].astype('category')
+    dataframe['task'] = dataframe['task'].astype('category')
     
-        data_dframe = pd.DataFrame(np.squeeze(data[:,:,i]), columns=tmpidx[1:(num_parcels+1)])
-        data_dframe['subject'] = single['subject']
-        data_dframe['age'] = single['age']
-        data_dframe['sex'] = single['sex']
-        data_dframe['site'] = single['site']
-        data_dframe['task'] = single['task']
-        data_dframe['study'] = single['study']
-        data_dframe['age_group'] = pd.cut(data_dframe['age'], bins=age_bins, labels=age_labels, right=False)
-        
-        dataframes.append(data_dframe)
+    dataframe=dataframe.sort_values(['subject','task']).reset_index(drop=True)
+ 
+    delta, theta, alpha, beta, gamma, aperoffset, aperexp = make_power_dataframes(dataframe)
+    single = dataframe[dataframe['Parcel'] == 'bankssts_1-lh'].copy()
+    
+    expected_n = dataframe[['subject', 'task']].drop_duplicates().shape[0]
+    actual_n = single.shape[0]
 
-    return dataframes
+    if expected_n != actual_n:
+        print(f"WARNING: Expected {expected_n} subject-task pairs, found {actual_n} in 'single'")
+ 
+    # select the band to harmonize
+    
+    if band == 'delta':
+        selected = delta
+        savename = 'delta'
+    elif band == 'theta':
+        selected = theta
+        savename = 'theta'
+    elif band == 'alpha':
+        selected = alpha
+        savename = 'alpha'
+    elif band == 'beta':
+        selected = beta
+        savename = 'beta'
+    elif band == 'gamma':
+        selected = gamma
+        savename = 'gamma'
+    elif band == 'aperoffset':
+        selected = aperoffset
+        savename = 'aperoffset'
+    elif band == 'aperexp':
+        selected = aperexp
+        savename = 'aperexp'   
+        
+    # combine the subparcellation columns
+ 
+    if do_subparc == False: 
+     
+        print('Combining subparcellation',flush=True)    
+
+        selected = combine_columns(selected)
+
+    # prepare the datasets for harmonization
+            
+    print('Preparing selected datasets for Harmonization',flush=True)
+      
+    single = single.sort_values(['subject', 'task']).reset_index(drop=True)           
+    selected = selected.sort_values(['subject', 'task']).reset_index(drop=True)     
+    
+    selected, selected_data, parcel_cols = prepare_to_harmonize(selected, single, num_parcels)
+    
+    single['study'] = single['study'].astype('category')
+    single['site'] = single['site'].astype('category')  
+    single['sex'] = single['sex'].astype('category')
+    single['task'] = single['task'].astype('category') 
+    
+    if (harm_task == False):
+        covars = pd.DataFrame.from_dict({'SITE': single[groupbyvar].cat.codes,
+                                  'age': single.age.values,
+                                  'sex': single.sex.cat.codes})
+    else:
+        covars = pd.DataFrame.from_dict({'SITE': single[groupbyvar].cat.codes,
+                                  'age': single.age.values,
+                                  'sex': single.sex.cat.codes,
+                                  'task': single.task.cat.codes})
+  
+    # ComBatGam neuroHarmonize
+
+    print('Harmonizing',flush=True)
+    model, adjusted_gamcombat = harmonizationLearn(np.array(selected_data),
+                                    covars, smooth_terms=['age'])
+    
+
+    if do_subparc == False:
+            saveHarmonizationModel(model, f'{prefix}_{savename}_full_neuroharmonizemodel')
+    else:
+            saveHarmonizationModel(model, f'{prefix}_{savename}_full_neuroharmonizemodel_subparc')
+     
+    adjusted_gamcombat_dframe = process_adjusted(adjusted_gamcombat, parcel_cols, single, num_parcels)
+ 
+    # Apply the model to the holdout data, if necessary
+  
+    print('Saving output data',flush=True)
+ 
+    if do_subparc == False:
+            adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_{savename}_dataframe.csv')
+            selected.to_csv(f'{prefix}_Orig_{savename}_dataframe.csv')
+    else:
+            adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_{savename}_dataframe_subparc.csv')
+            selected.to_csv(f'{prefix}_Orig_{savename}_dataframe_subparc.csv')
+
+    print('Done, thanks for harmonizing!')
 
 def main():
     
@@ -311,338 +354,20 @@ def main():
     parser.add_argument('-harmonize_task', help='''Use task as a variable to retain post-harmonization''',
                         action='store_true',
                         default=0)
+    parser.add_argument('-groupby_var', help='''The grouping variable to harmonize on - site or study''')
     parser.add_argument('-outputfile', help='''Prefix for outputfiles''')
+    parser.add_argument('-band',help='''What band to harmonize''')
 
     args = parser.parse_args()
     filename = args.input_file
     do_subparc = args.process_full_subparc
     harm_task = args.harmonize_task
     prefix = args.outputfile
+    groupbyvar = args.groupby_var
+    band = args.band
     
-    if do_subparc == True:
-        num_parcels = 448
-    else:
-        num_parcels = 68
-        
-    dataframe = pd.read_csv(filename)
-    print('Dataframe read, number of subjects is %d' % (int(len(dataframe)/448)))
+    harmonize(filename, do_subparc, harm_task, prefix, groupbyvar, band)
     
-    dataframe = dataframe.dropna(subset='age').reset_index()
-    print('Age NaN values dropped, number of subjects is %d' % (int(len(dataframe)/448)))
-    
-    # extract column headings 
-    dataframe['study'] = dataframe['study'].astype('category')
-    dataframe['site'] = dataframe['site'].astype('category')  
-    dataframe['sex'] = dataframe['sex'].astype('category')
-    dataframe['task'] = dataframe['task'].astype('category')
-    
-    dataframe=dataframe.sort_values(['subject','task'])
-    
-    delta, theta, alpha, beta, gamma = make_power_dataframes(dataframe)
-    
-    single = dataframe[dataframe['Parcel'] == 'bankssts_1-lh'].reset_index()
-    num_subjects = len(single)
-    
-    # combine the subparcellation columns
-    
-    if do_subparc == False: 
-        delta = combine_columns(delta)
-        theta = combine_columns(theta)
-        alpha = combine_columns(alpha)
-        beta = combine_columns(beta)
-        gamma = combine_columns(gamma)
-    
-    # prepare the datasets for harmonization
-    
-    delta, delta_data = prepare_to_harmonize(delta, single, num_parcels)
-    theta, theta_data = prepare_to_harmonize(theta, single, num_parcels)
-    alpha, alpha_data = prepare_to_harmonize(alpha, single, num_parcels)
-    beta, beta_data = prepare_to_harmonize(beta, single, num_parcels)
-    gamma, gamma_data = prepare_to_harmonize(gamma, single, num_parcels)
-
-    if (harm_task == False):
-        covars = pd.DataFrame.from_dict({'SITE': single.study.cat.codes,
-                                     'age': single.age.values,
-                                     'sex': single.sex.cat.codes,
-                                     'age2': single.age.values*single.age.values,
-                                     'age3': single.age.values*single.age.values*single.age.values})
-    else:
-        covars = pd.DataFrame.from_dict({'SITE': single.study.cat.codes,
-                                     'age': single.age.values,
-                                     'sex': single.sex.cat.codes,
-                                     'task': single.task.cat.codes,
-                                     'age2': single.age.values*single.age.values,
-                                     'age3': single.age.values*single.age.values*single.age.values})
-    
-    tmpidx = delta.columns.to_flat_index().tolist()
-    
-    studyid = np.array(single.study.cat.codes)
-    
-    # perform the harmonizations
-  
-    # oh what the hell, let's add one more, let's do RELIEF too
-
-    delta_data_r = robjects.r['matrix'](delta_data.T, num_parcels, num_subjects)
-    theta_data_r = robjects.r['matrix'](theta_data.T, num_parcels, num_subjects)
-    alpha_data_r = robjects.r['matrix'](alpha_data.T, num_parcels, num_subjects)
-    beta_data_r = robjects.r['matrix'](beta_data.T, num_parcels, num_subjects)
-    gamma_data_r = robjects.r['matrix'](gamma_data.T, num_parcels, num_subjects)
-
-    studyid_r = robjects.IntVector(studyid)
-        
-    output_delta = relief(delta_data_r, studyid_r)
-    output_theta = relief(theta_data_r, studyid_r)
-    output_alpha = relief(alpha_data_r, studyid_r)
-    output_beta = relief(beta_data_r, studyid_r)
-    output_gamma = relief(gamma_data_r, studyid_r)
-        
-    delta_dat_relief = output_delta.rx2['dat.relief']
-    theta_dat_relief = output_theta.rx2['dat.relief']
-    alpha_dat_relief = output_alpha.rx2['dat.relief']
-    beta_dat_relief = output_beta.rx2['dat.relief']
-    gamma_dat_relief = output_gamma.rx2['dat.relief']
-        
-    delta_adjusted_relief_dframe = process_adjusted(delta_dat_relief.T, tmpidx, single, num_parcels)
-    theta_adjusted_relief_dframe = process_adjusted(theta_dat_relief.T, tmpidx, single, num_parcels)
-    alpha_adjusted_relief_dframe = process_adjusted(alpha_dat_relief.T, tmpidx, single, num_parcels)
-    beta_adjusted_relief_dframe = process_adjusted(beta_dat_relief.T, tmpidx, single, num_parcels)
-    gamma_adjusted_relief_dframe = process_adjusted(gamma_dat_relief.T, tmpidx, single, num_parcels)
-
-    if do_subparc == False:
-            delta_adjusted_relief_dframe.to_csv(f'{prefix}_ReliefAdjusted_delta_dataframe.csv')
-            theta_adjusted_relief_dframe.to_csv(f'{prefix}_ReliefAdjusted_theta_dataframe.csv')
-            alpha_adjusted_relief_dframe.to_csv(f'{prefix}_ReliefAdjusted_alpha_dataframe.csv')
-            beta_adjusted_relief_dframe.to_csv(f'{prefix}_ReliefAdjusted_beta_dataframe.csv')
-            gamma_adjusted_relief_dframe.to_csv(f'{prefix}_ReliefAdjusted_gamma_dataframe.csv')
-    else:
-            delta_adjusted_relief_dframe.to_csv(f'{prefix}_ReliefAdjusted_delta_dataframe_subparc.csv')
-            theta_adjusted_relief_dframe.to_csv(f'{prefix}_ReliefAdjusted_theta_dataframe_subparc.csv')
-            alpha_adjusted_relief_dframe.to_csv(f'{prefix}_ReliefAdjusted_alpha_dataframe_subparc.csv')
-            beta_adjusted_relief_dframe.to_csv(f'{prefix}_ReliefAdjusted_beta_dataframe_subparc.csv')
-            gamma_adjusted_relief_dframe.to_csv(f'{prefix}_ReliefAdjusted_gamma_dataframe_subparc.csv')
-
-    # First - just do ComBat normalization, inculding age2 as a covariate
-    if (harm_task == False):
-        output_combat_delta = neuroCombat(delta_data.T, covars, 'SITE', ['sex'], eb=True)
-        output_combat_theta = neuroCombat(theta_data.T, covars, 'SITE', ['sex'], eb=True)
-        output_combat_alpha = neuroCombat(alpha_data.T, covars, 'SITE', ['sex'], eb=True)
-        output_combat_beta = neuroCombat(beta_data.T, covars, 'SITE', ['sex'], eb=True)
-        output_combat_gamma = neuroCombat(gamma_data.T, covars, 'SITE', ['sex'], eb=True)
-        
-    else:
-            output_combat_delta = neuroCombat(delta_data.T, covars, 'SITE', ['sex','task'], eb=True)
-            output_combat_theta = neuroCombat(theta_data.T, covars, 'SITE', ['sex','task'], eb=True)
-            output_combat_alpha = neuroCombat(alpha_data.T, covars, 'SITE', ['sex','task'], eb=True)
-            output_combat_beta = neuroCombat(beta_data.T, covars, 'SITE', ['sex','task'], eb=True)
-            output_combat_gamma = neuroCombat(gamma_data.T, covars, 'SITE', ['sex','task'], eb=True)
-
-    delta_adjusted_combat_dframe = process_adjusted(output_combat_delta['data'].T, tmpidx, single, num_parcels)
-    theta_adjusted_combat_dframe = process_adjusted(output_combat_theta['data'].T, tmpidx, single, num_parcels)
-    alpha_adjusted_combat_dframe = process_adjusted(output_combat_alpha['data'].T, tmpidx, single, num_parcels)
-    beta_adjusted_combat_dframe = process_adjusted(output_combat_beta['data'].T, tmpidx, single, num_parcels)
-    gamma_adjusted_combat_dframe = process_adjusted(output_combat_gamma['data'].T, tmpidx, single, num_parcels)
-   
-    if do_subparc == False:
-        delta_adjusted_combat_dframe.to_csv(f'{prefix}_ComBatAdjusted_delta_dataframe.csv')
-        theta_adjusted_combat_dframe.to_csv(f'{prefix}_ComBatAdjusted_theta_dataframe.csv')
-        alpha_adjusted_combat_dframe.to_csv(f'{prefix}_ComBatAdjusted_alpha_dataframe.csv')
-        beta_adjusted_combat_dframe.to_csv(f'{prefix}_ComBatAdjusted_beta_dataframe.csv')
-        gamma_adjusted_combat_dframe.to_csv(f'{prefix}_ComBatAdjusted_gamma_dataframe.csv')
-    else:
-        delta_adjusted_combat_dframe.to_csv(f'{prefix}_ComBatAdjusted_delta_dataframe_subparc.csv')
-        theta_adjusted_combat_dframe.to_csv(f'{prefix}_ComBatAdjusted_theta_dataframe_subparc.csv')
-        alpha_adjusted_combat_dframe.to_csv(f'{prefix}_ComBatAdjusted_alpha_dataframe_subparc.csv')
-        beta_adjusted_combat_dframe.to_csv(f'{prefix}_ComBatAdjusted_beta_dataframe_subparc.csv')
-        gamma_adjusted_combat_dframe.to_csv(f'{prefix}_ComBatAdjusted_gamma_dataframe_subparc.csv')
-
-    if (harm_task == False):
-         covars = pd.DataFrame.from_dict({'SITE': single.study.cat.codes,
-                                      'age': single.age.values,
-                                      'sex': single.sex.cat.codes})
-    else:
-         covars = pd.DataFrame.from_dict({'SITE': single.study.cat.codes,
-                                      'age': single.age.values,
-                                      'sex': single.sex.cat.codes,
-                                      'task': single.task.cat.codes})
-         
-   # Second - do ComBatGam neuroHarmonize
-   
-    if (harm_task == False):
-       
-       print('Harmonizing Delta')
-       delta_model, delta_adjusted_gamcombat = harmonizationLearn(delta_data,
-                                       covars, smooth_terms=['age','sex'])
-       print('Harmonizing Theta')
-       theta_model, theta_adjusted_gamcombat = harmonizationLearn(np.array(theta_data),
-                                        covars, smooth_terms=['age','sex'])
-       print('Harmonizing Alpha')
-       alpha_model, alpha_adjusted_gamcombat = harmonizationLearn(np.array(alpha_data),
-                                       covars, smooth_terms=['age','sex'])
-       print('Harmonizing Beta')
-       beta_model, beta_adjusted_gamcombat = harmonizationLearn(np.array(beta_data),
-                                        covars, smooth_terms=['age','sex'])
-       print('Harmonizing Gamma')
-       gamma_model, gamma_adjusted_gamcombat = harmonizationLearn(np.array(gamma_data),
-                                       covars, smooth_terms=['age','sex'])
-       
-    else:
-       
-       print('Harmonizing Delta')
-       delta_model, delta_adjusted_gamcombat = harmonizationLearn(delta_data,
-                                       covars, smooth_terms=['age','sex','task'])
-       print('Harmonizing Theta')
-       theta_model, theta_adjusted_gamcombat = harmonizationLearn(np.array(theta_data),
-                                        covars, smooth_terms=['age','sex','task'])
-       print('Harmonizing Alpha')
-       alpha_model, alpha_adjusted_gamcombat = harmonizationLearn(np.array(alpha_data),
-                                       covars, smooth_terms=['age','sex','task'])
-       print('Harmonizing Beta')
-       beta_model, beta_adjusted_gamcombat = harmonizationLearn(np.array(beta_data),
-                                        covars, smooth_terms=['age','sex','task'])
-       print('Harmonizing Gamma')
-       gamma_model, gamma_adjusted_gamcombat = harmonizationLearn(np.array(gamma_data),
-                                       covars, smooth_terms=['age','sex','task'])
- 
-    delta_adjusted_gamcombat_dframe = process_adjusted(delta_adjusted_gamcombat, tmpidx, single, num_parcels)
-    theta_adjusted_gamcombat_dframe = process_adjusted(theta_adjusted_gamcombat, tmpidx, single, num_parcels)
-    alpha_adjusted_gamcombat_dframe = process_adjusted(alpha_adjusted_gamcombat, tmpidx, single, num_parcels)
-    beta_adjusted_gamcombat_dframe = process_adjusted(beta_adjusted_gamcombat, tmpidx, single, num_parcels)
-    gamma_adjusted_gamcombat_dframe = process_adjusted(gamma_adjusted_gamcombat, tmpidx, single, num_parcels)
-    
-    if do_subparc == False:
-        delta_adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_delta_dataframe.csv')
-        theta_adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_theta_dataframe.csv')
-        alpha_adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_alpha_dataframe.csv')
-        beta_adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_beta_dataframe.csv')
-        gamma_adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_gamma_dataframe.csv')
-    else:
-        delta_adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_delta_dataframe_subparc.csv')
-        theta_adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_theta_dataframe_subparc.csv')
-        alpha_adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_alpha_dataframe_subparc.csv')
-        beta_adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_beta_dataframe_subparc.csv')
-        gamma_adjusted_gamcombat_dframe.to_csv(f'{prefix}_gamComBatAdjusted_gamma_dataframe_subparc.csv')
-
-    if do_subparc == False:
-        saveHarmonizationModel(delta_model, f'{prefix}_delta_neuroharmonizemodel')
-        saveHarmonizationModel(theta_model, f'{prefix}_theta_neuroharmonizemodel')
-        saveHarmonizationModel(alpha_model, f'{prefix}_alpha_neuroharmonizemodel')
-        saveHarmonizationModel(beta_model, f'{prefix}_beta_neuroharmonizemodel')
-        saveHarmonizationModel(gamma_model, f'{prefix}_gamma_neuroharmonizemodel')    
-    else:
-        saveHarmonizationModel(delta_model, f'{prefix}_delta_neuroharmonizemodel_subparc')
-        saveHarmonizationModel(theta_model, f'{prefix}_theta_neuroharmonizemodel_subparc')
-        saveHarmonizationModel(alpha_model, f'{prefix}_alpha_neuroharmonizemodel_subparc')
-        saveHarmonizationModel(beta_model, f'{prefix}_beta_neuroharmonizemodel_subparc')
-        saveHarmonizationModel(gamma_model, f'{prefix}_gamma_neuroharmonizemodel_subparc')    
-
-    # Now, finally, do ComBatGam Harmonization + CovBat
-         
-    if (harm_task == False):
-        
-        print('Harmonizing Delta')
-        delta_model, delta_level2model, delta_adjusted, delta_adjusted_combat = harmonizationCovLearn(delta_data,
-                                        covars, smooth_terms=['age','sex'], pct_var=[0.9,0.95,1] )
-        print('Harmonizing Theta')
-        theta_model, theta_level2model, theta_adjusted, theta_adjusted_combat = harmonizationCovLearn(np.array(theta_data),
-                                         covars, smooth_terms=['age','sex'], pct_var=[0.9,0.95,1])
-        print('Harmonizing Alpha')
-        alpha_model, alpha_level2model, alpha_adjusted, alpha_adjusted_combat = harmonizationCovLearn(np.array(alpha_data),
-                                        covars, smooth_terms=['age','sex'], pct_var=[0.9,0.95,1])
-        print('Harmonizing Beta')
-        beta_model, beta_level2model, beta_adjusted, beta_adjusted_combat = harmonizationCovLearn(np.array(beta_data),
-                                         covars, smooth_terms=['age','sex'], pct_var=[0.9,0.95,1])
-        print('Harmonizing Gamma')
-        gamma_model, gamma_level2model, gamma_adjusted, gamma_adjusted_combat = harmonizationCovLearn(np.array(gamma_data),
-                                        covars, smooth_terms=['age','sex'], pct_var=[0.9,0.95,1])
-        
-    else:
-        
-        print('Harmonizing Delta')
-        delta_model, delta_level2model, delta_adjusted, delta_adjusted_combat = harmonizationCovLearn(delta_data,
-                                        covars, smooth_terms = ['age', 'sex', 'task'], pct_var=[0.9,0.95,1])
-        print('Harmonizing Theta')
-        theta_model, theta_level2model, theta_adjusted, theta_adjusted_combat = harmonizationCovLearn(np.array(theta_data),
-                                         covars, smooth_terms = ['age', 'sex', 'task'], pct_var=[0.9,0.95,1])
-        print('Harmonizing Alpha')
-        alpha_model, alpha_level2model, alpha_adjusted, alpha_adjusted_combat = harmonizationCovLearn(np.array(alpha_data),
-                                        covars, smooth_terms = ['age', 'sex', 'task'], pct_var=[0.9,0.95,1])
-        print('Harmonizing Beta')
-        beta_model, beta_level2model, beta_adjusted, beta_adjusted_combat = harmonizationCovLearn(np.array(beta_data),
-                                         covars, smooth_terms = ['age', 'sex', 'task'], pct_var=[0.9,0.95,1])
-        print('Harmonizing Gamma')
-        gamma_model, gamma_level2model, gamma_adjusted, gamma_adjusted_combat = harmonizationCovLearn(np.array(gamma_data),
-                                        covars, smooth_terms = ['age', 'sex', 'task'], pct_var=[0.9,0.95,1])
-
-    # fix up the adjusted data
-        
-    delta_adjusted_dframe = process_adjusted_covbat(delta_adjusted, tmpidx, single, num_parcels)
-    theta_adjusted_dframe = process_adjusted_covbat(theta_adjusted, tmpidx, single, num_parcels)
-    alpha_adjusted_dframe = process_adjusted_covbat(alpha_adjusted, tmpidx, single, num_parcels)
-    beta_adjusted_dframe = process_adjusted_covbat(beta_adjusted, tmpidx, single, num_parcels)
-    gamma_adjusted_dframe = process_adjusted_covbat(gamma_adjusted, tmpidx, single, num_parcels)
-        
-    # output the adjusted dataframes
-    
-    pct_var = [0.9,0.95,1]
-    
-    varidx = 0
-    for var in pct_var:
-    
-        if do_subparc == False:
-            delta_adjusted_dframe[varidx].to_csv(f'{prefix}_CovBatAdjusted{var}_delta_dataframe.csv')
-            theta_adjusted_dframe[varidx].to_csv(f'{prefix}_CovBatAdjusted{var}_theta_dataframe.csv')
-            alpha_adjusted_dframe[varidx].to_csv(f'{prefix}_CovBatAdjusted{var}_alpha_dataframe.csv')
-            beta_adjusted_dframe[varidx].to_csv(f'{prefix}_CovBatAdjusted{var}_beta_dataframe.csv')
-            gamma_adjusted_dframe[varidx].to_csv(f'{prefix}_CovBatAdjusted{var}_gamma_dataframe.csv')
-
-            saveHarmonizationModelNeuroCombat(delta_level2model[varidx], f'{prefix}_delta_level2neurocombatmodel{var}')
-            saveHarmonizationModelNeuroCombat(theta_level2model[varidx], f'{prefix}_theta_level2neurocombatmodel{var}')
-            saveHarmonizationModelNeuroCombat(alpha_level2model[varidx], f'{prefix}_alpha_level2neurocombatmodel{var}')
-            saveHarmonizationModelNeuroCombat(beta_level2model[varidx], f'{prefix}_beta_level2neurocombatmodel{var}')
-            saveHarmonizationModelNeuroCombat(gamma_level2model[varidx], f'{prefix}_gamma_level2neurocombatmodel{var}')
-
-        else:
-            delta_adjusted_dframe[varidx].to_csv(f'{prefix}_CovBatAdjusted_delta_dataframe_subparc.csv')
-            theta_adjusted_dframe[varidx].to_csv(f'{prefix}_CovBatAdjusted_theta_dataframe_subparc.csv')
-            alpha_adjusted_dframe[varidx].to_csv(f'{prefix}_CovBatAdjusted_alpha_dataframe_subparc.csv')
-            beta_adjusted_dframe[varidx].to_csv(f'{prefix}_CovBatAdjusted_beta_dataframe_subparc.csv')
-            gamma_adjusted_dframe[varidx].to_csv(f'{prefix}_CovBatAdjusted_gamma_dataframe_subparc.csv')    
-
-            saveHarmonizationModelNeuroCombat(delta_level2model[varidx], f'{prefix}_delta_level2neurocombatmodel{var}_subparc')
-            saveHarmonizationModelNeuroCombat(theta_level2model[varidx], f'{prefix}_theta_level2neurocombatmodel{var}_subparc')
-            saveHarmonizationModelNeuroCombat(alpha_level2model[varidx], f'{prefix}_alpha_level2neurocombatmodel{var}_subparc')
-            saveHarmonizationModelNeuroCombat(beta_level2model[varidx], f'{prefix}_beta_level2neurocombatmodel{var}_subparc')
-            saveHarmonizationModelNeuroCombat(gamma_level2model[varidx], f'{prefix}_gamma_level2neurocombatmodel{var}_subparc')
-          
-        varidx += 1    
-        
-    if do_subparc == False:
-        delta.to_csv(f'{prefix}_Orig_delta_dataframe.csv')
-        theta.to_csv(f'{prefix}_Orig_theta_dataframe.csv')
-        alpha.to_csv(f'{prefix}_Orig_alpha_dataframe.csv')
-        beta.to_csv(f'{prefix}_Orig_beta_dataframe.csv')
-        gamma.to_csv(f'{prefix}_Orig_gamma_dataframe.csv')
-    else:
-        delta.to_csv(f'{prefix}_Orig_delta_dataframe_subparc.csv')
-        theta.to_csv(f'{prefix}_Orig_theta_dataframe_subparc.csv')
-        alpha.to_csv(f'{prefix}_Orig_alpha_dataframe_subparc.csv')
-        beta.to_csv(f'{prefix}_Orig_beta_dataframe_subparc.csv')
-        gamma.to_csv(f'{prefix}_Orig_gamma_dataframe_subparc.csv')
-
-    if do_subparc == False:
-        saveHarmonizationModel(delta_model, f'{prefix}_delta_neurocov_neuroharmonizemodel')
-        saveHarmonizationModel(theta_model, f'{prefix}_theta_neurocov_neuroharmonizemodel')
-        saveHarmonizationModel(alpha_model, f'{prefix}_alpha_neurocov_neuroharmonizemodel')
-        saveHarmonizationModel(beta_model, f'{prefix}_beta_neurocov_neuroharmonizemodel')
-        saveHarmonizationModel(gamma_model, f'{prefix}_gamma_neurocov_neuroharmonizemodel')    
-    
-    else:
-        saveHarmonizationModel(delta_model, f'{prefix}_delta_neurocov_neuroharmonizemodel_subparc')
-        saveHarmonizationModel(theta_model, f'{prefix}_theta_neurocov_neuroharmonizemodel_subparc')
-        saveHarmonizationModel(alpha_model, f'{prefix}_alpha_neurocov_neuroharmonizemodel_subparc')
-        saveHarmonizationModel(beta_model, f'{prefix}_beta_neurohcov_neuroharmonizemodel_subparc')
-        saveHarmonizationModel(gamma_model, f'{prefix}_gamma_neurocov_neuroharmonizemodel_subparc')    
-
 if __name__=='__main__':
     main()
 
