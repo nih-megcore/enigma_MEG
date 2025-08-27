@@ -21,9 +21,9 @@ classifiers=[
         "Operating System :: Linux/Unix",
     ]
 dependencies = [
-    'mne<3.16', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof', 'munch', 'pysimplegui-4-foss',
-    'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'mne_bids<0.16', 'matplotlib<3.10',
-    'MEGnet @ git+https://github.com/nih-megcore/MegNET_2020.git', 
+    'mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof', 'munch', 'pysimplegui-4-foss',
+    'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'mne_bids<0.16', 'matplotlib',
+    'MEGnet @ git+https://github.com/nih-megcore/MegNet.git', 'h5io',
     'pyctf-lite @ git+https://github.com/nih-megcore/pyctf-lite.git'
 ]
 dynamic = ["version"]
