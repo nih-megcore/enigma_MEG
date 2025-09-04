@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "enigmeg"
 description = "Package to calculate metrics for the Enigma MEG consortium"
 readme = "README.md"
-requires-python = "<3.12"
+requires-python = "<3.12" #Current limitation of tensorflow pinned verion
 #keywords = ["one", "two"]
 
 authors = [
