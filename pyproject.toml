@@ -3,30 +3,28 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "enigmeg"
+name = "enigma-meg"
 description = "Package to calculate metrics for the Enigma MEG consortium"
 readme = "README.md"
 requires-python = "<3.12" #Current limitation of tensorflow pinned verion
-#keywords = ["one", "two"]
 
 authors = [
   { name="Jeff Stout", email="stoutjd@nih.gov" },
   { name="Allison Nugent", email="nugenta@nih.gov" },
 ]
 
-license = {text = "UNLICENSE"}
+license = "UNLICENSE"
+license-files = ["UNLICENSE"]
 classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: UNLICENSE",
-        "Operating System :: Linux/Unix",
+        "Operating System :: POSIX",
     ]
 dependencies = [
     'mne', 'numpy', 'scipy', 'pandas', 'neurodsp', 'fooof', 'munch', 'pysimplegui-4-foss',
     'statsmodels', 'nibabel', 'pytest', 'joblib', 'seaborn', 'mne_bids<0.16', 'matplotlib',
-    'MEGnet @ git+https://github.com/nih-megcore/MegNet.git', 'h5io',
-    'pyctf @ git+https://github.com/nih-megcore/pyctf-lite.git'
+    'MEGnet-neuro', 'h5io', 'pyctf-nihmegcore'
 ]
-dynamic = ["version"]
+version = '1.0.1'
 
 [project.optional-dependencies]
 testing = ['datalad','pytest','pygit2', 'pytest-cov']
