@@ -47,25 +47,31 @@ def check_age(age):
 
 def check_sex(sex):
     
-    if (sex == 'f') | (sex == 'F') | (sex == 'female') | (sex == 'FEMALE'):
+    if (sex == 'f') | (sex == 'F') | (sex == 'female') | (sex == 'FEMALE') | (sex == 'Female'):
         sex_out = 'F'
-    elif (sex == 'm') | (sex == 'M') | (sex == 'male') | (sex == 'MALE'):
+    elif (sex == 'm') | (sex == 'M') | (sex == 'male') | (sex == 'MALE') | (sex == 'Male'):
         sex_out = 'M'
     else:
         sex_out = 'N'
         
     return sex_out
 
-def check_task(task):
+def check_task(task, run):
+    
+    out_run = run
     
     if (task == 'resteyesclosed') | (task == 'eyesclosed') | (task == 'restEC') | (task == 'RestEC'):
         out_task = 'eyesclosed'
-    elif (task == 'resteyesopen') | (task == 'eyesopen') | (task == 'restEO') | (task == 'RestEO') | (task == 'eyesNA'):
+    elif (task == 'resteyesopen') | (task == 'eyesopen') | (task == 'restEO') | (task == 'RestEO'):
         out_task = 'eyesopen'
+    elif (task == 'eyesNA'):
+        out_task = 'eyesopen'
+        int_run = int(run)
+        out_run = str(int_run + 5).zfill(2)
     else:
         out_task = task
         
-    return out_task
+    return out_task, out_run
 
 def check_hand(hand):
     
@@ -73,6 +79,8 @@ def check_hand(hand):
         out_hand = 'R'
     elif (hand == 'l') | (hand == 'left') | (hand == 'L') | (hand == 'LEFT'):
         out_hand = 'L'
+    elif (hand == 'Ambidextrous'):
+        out_hand = 'A'
     else:
         out_hand = 'N'
         
@@ -80,7 +88,7 @@ def check_hand(hand):
 
 def check_group(group):
     
-    if (group == 'Control') | (group == 'HV') | (group == 'HC'):
+    if (group == 'Control') | (group == 'HV') | (group == 'HC') | (group == 'HCL') | (group == 'control'):
         out_group = 'Control'
     else:
         out_group = group
@@ -373,21 +381,23 @@ if __name__=='__main__':
             
         # check task
             
-        subj_power_dframe['task'] = check_task(row['task'])
-        subj_spectra_dframe['task'] = check_task(row['task'])
-        
+        task, run = check_task(row['task'], row['run'])
+        subj_power_dframe['task'] = task
+        subj_spectra_dframe['task'] = task
+        row['run'] = run
+       
         # check group
         
         if 'group' in row:
             subj_power_dframe['group'] = check_group(row['group'])
             subj_spectra_dframe['group'] = check_group(row['group'])                     
-        elif 'Diagnosis_TP1' in row:
-            if 'control' in row['Diagnosis_TP1']:
+        elif 'Diagnosis_TP_scan' in row:
+            if 'control' in row['Diagnosis_TP_scan']:
                 subj_power_dframe['group'] = 'Control'
                 subj_spectra_dframe['group'] = 'Control'
             else:
-                subj_power_dframe['group'] = row['Diagnosis_TP1']
-                subj_spectra_dframe['group'] = row['Diagnosis_TP1']
+                subj_power_dframe['group'] = row['Diagnosis_TP_scan']
+                subj_spectra_dframe['group'] = row['Diagnosis_TP_scan']
         elif 'Diagnosis' in row:
             subj_power_dframe['group'] = check_group(row['Diagnosis'])
             subj_spectra_dframe['group'] = check_group(row['Diagnosis'])                     

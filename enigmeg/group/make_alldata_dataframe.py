@@ -83,6 +83,10 @@ if __name__=='__main__':
             SiteName = 'SANCAMILLO'
         elif 'MRN' in StudyName:
             SiteName = 'MRN'
+        elif 'UPITT' in StudyName or 'UPMC' in StudyName:
+            SiteName = 'PITT'
+        elif 'CAMCAN' in StudyName or 'Cambridge' in StudyName:
+            SiteName = 'Cambridge'
         else:
             SiteName = StudyName       
             
@@ -92,7 +96,7 @@ if __name__=='__main__':
             powerdataframe['task'] = 'eyesclosed'
             spectradataframe['task'] = 'eyesclosed'
             extradataframe['task'] = 'eyesclosed'
-        if (StudyName == 'MOUS') | ('MRN' in StudyName) | (StudyName == 'CHOP') | (StudyName == 'HCP') | (StudyName == 'OMEGA') | (StudyName == 'Aston1') | (StudyName == 'NIHSTRINGARIS') | (StudyName == 'NIHYANOVSKI') | (SiteName == 'CEA') | (StudyName == 'NYUAD') | (StudyName == 'NYUNY') | (StudyName == 'UPMCDS'):
+        if (StudyName == 'MOUS') | ('MRN-DEVCOG' in StudyName) | (StudyName == 'CHOP') | (StudyName == 'HCP') | (StudyName == 'OMEGA') | (StudyName == 'Aston1') | (StudyName == 'NIHSTRINGARIS') | (StudyName == 'NIHYANOVSKI') | (SiteName == 'CEA') | (StudyName == 'NYUAD') | (StudyName == 'NYUNY') | (StudyName == 'UPMCDS'):
             powerdataframe['task'] = 'eyesopen'
             spectradataframe['task'] = 'eyesopen'
             extradataframe['task'] = 'eyesopen'
@@ -133,7 +137,7 @@ if __name__=='__main__':
         extramerge = pd.merge(extradataframe, extrafirst,how='inner',
                               on=['subject','task','ses','run']).reset_index(drop=True)
         
-        print('length of dataset with repeat runs %d length of datasets with repeats removed %d' % (len(powerfirst), len(powersort)/448))
+        print('length of dataset with repeat runs %d length of datasets with repeats removed %d' % (len(powersort)/448, len(powerfirst)))
         
         list_of_powerdframes_norepeats.append(powermerge) 
         list_of_spectradframes_norepeats.append(spectramerge) 

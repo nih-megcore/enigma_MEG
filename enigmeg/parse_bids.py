@@ -66,8 +66,10 @@ def assemble_cmd(row, bids_root=None):
         'eroom_tag':'-emptyroom_tag',
                 }
     
-    if row['eroom'] != None :
+    if row['eroom'] != None and row['type'] != 'c,rf':
         row['eroom_tag']=op.basename(row.eroom).split('_task')[1].split('_')[0][1:]
+    elif row['eroom'] != None and row['type'] == 'c,rf':
+        row['eroom_tag']=op.basename(op.dirname(row.eroom)).split('_task')[1].split('_')[0][1:]
     else:
         row['eroom_tag']=None
 
