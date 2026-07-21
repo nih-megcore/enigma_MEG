@@ -12,6 +12,7 @@ from mne_bids import BIDSPath
 from mne.viz import Brain
 import matplotlib.pyplot as plt
 from enigmeg.process_meg import load_data
+import pandas as pd
 
 def gen_coreg_pngs(subjstruct):
     
@@ -239,6 +240,50 @@ def gen_epo_pngs(subjstruct):
     
     fig = epochs.compute_psd(fmin=subjstruct.proc_vars['fmin'],fmax=subjstruct.proc_vars['fmax']).plot(picks='meg')
     fig.savefig(figname, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
+def gen_sourcepsd_pngs(subjstruct):
+
+    figname_basename = subjstruct.deriv_path.update(
+       root=subjstruct.bids_root,
+       task = subjstruct.meg_rest_raw.task,
+       datatype = 'meg',
+       subject=subjstruct.subject,
+       session=subjstruct.meg_rest_raw.session,
+       run=subjstruct.meg_rest_raw.run,
+       suffix = 'sourcepsd',
+       extension='.png'
+       ).basename
+
+    figname = op.join(subjstruct.QA_dir.directory, figname_basename)
+    
+    if subjstruct.session != None:
+       if subjstruct.run != None:
+          spectname = op.join(subjstruct.rest_derivpath.directory, 
+                f'sub-{subjstruct.subject}_ses-{subjstruct.session}_meg_label_task-{subjstruct.meg_rest_raw.task}_run-{subjstruct.run}_spectra.csv')
+       else:
+          spectname = op.join(subjstruct.rest_derivpath.directory, 
+                f'sub-{subjstruct.subject}_ses-{subjstruct.session}_meg_label_task-{subjstruct.meg_rest_raw.task}_spectra.csv') 
+       
+    else:
+        if subjstruct.run != None:
+           spectname = op.join(subjstruct.rest_derivpath.directory, 
+                 f'sub-{subjstruct.subject}_meg_label_task-{subjstruct.meg_rest_raw.task}_run-{subjstruct.run}_spectra.csv')
+        else:
+           spectname = op.join(subjstruct.rest_derivpath.directory, 
+                 f'sub-{subjstruct.subject}_meg_label_task-{subjstruct.meg_rest_raw.task}_spectra.csv') 
+        
+        
+    df = pd.read_csv(spectname)
+    # drop the "unknown-lh" and "unknown-rh" parcels
+    df = df.drop([225,449])
+    x=df.columns.astype(float).values
+        
+    fig, ax = plt.subplots()
+    ax.plot(x, df.values.T)
+        
+    fig.savefig(figname, dpi=300, bbox_inches='tight')
+    plt.close(fig)
 
 def gen_fooof_pngs(subjstruct):
     

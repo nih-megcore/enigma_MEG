@@ -10,7 +10,7 @@ import os, os.path as op
 import argparse
 import enigmeg
 from enigmeg.process_meg import process
-from enigmeg.QA.enigma_QA_functions import gen_coreg_pngs, gen_bem_pngs, gen_src_pngs, gen_surf_pngs
+from enigmeg.QA.enigma_QA_functions import gen_coreg_pngs, gen_bem_pngs, gen_src_pngs, gen_surf_pngs, gen_sourcepsd_pngs
 from enigmeg.QA.enigma_QA_functions import gen_epo_pngs, gen_fooof_pngs
 import sys
 import pandas as pd
@@ -31,6 +31,8 @@ def _prepare_QA(subjstruct):
     gen_surf_pngs(subjstruct)
     
     gen_epo_pngs(subjstruct)
+    
+    gen_sourcepsd_pngs(subjstruct)
     
     gen_fooof_pngs(subjstruct)
 
