@@ -15,6 +15,7 @@ import mne
 import re
 import glob
 import numpy as np
+import ast
 import pandas as pd
 import enigmeg
 from enigmeg.spectral_peak_analysis import calc_spec_peak
@@ -636,17 +637,6 @@ class process():
         self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
         self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
 
-    def prep_ica_qa(self):      # if desired, create QA images for ICA components
-        ica_fname = self.fnames.ica
-        raw_fname = self.fnames.ica_megnet_raw
-        
-        prep_fcn_path = op.join(enigmeg.__path__[0], 'QA/make_ica_qa.py')
-        
-        output_path = str(self.deriv_path.directory).replace('ENIGMA_MEG','ENIGMA_MEG_QA')
-        output_path = op.dirname(output_path)
-        
-        subprocess.run(['python', prep_fcn_path, '-ica_fname', ica_fname, '-raw_fname', raw_fname,
-                        '-vendor', self.vendor[0], '-results_dir', output_path, '-basename', self.meg_rest_raw.basename])
     @log           
     def do_classify_ica(self):  # use the MEGNET model to automatically classify ICA components as artifactual
         from scipy.io import loadmat
@@ -666,15 +656,25 @@ class process():
         logger.info(logstring)
         logstring = 'Components to reject: ' + str(self.ica_comps_toremove)
         logger.info(logstring)
-
+    @log
     def set_ica_comps_manual(self): # If components were selected using manual QA, parse log files to generate list
         # lots of filenames have to be redefined here, if we've picked up after doing manual QA
+        
+        bids_root = self.bids_root
+        log_dir = f'{bids_root}/derivatives/ENIGMA_MEG/logs'
+        entities = mne_bids.get_entities_from_fname(self.fnames['raw_rest'])
+        if self.session == None:
+            logfilename = self.subject + '_ses-None_task-' + str(entities['task']) + '_run-' + str(entities['run']) + '_log.txt'
+        else: 
+            logfilename = self.subject + '_ses-' + str(entities['session']) + '_task-' + str(entities['task']) + '_run-' + str(entities['run']) + '_log.txt'
+        
+        logfilename = op.join(log_dir, logfilename)
+        comps = get_comps(logfilename)
         ica_basename = self.meg_rest_raw.basename + '_ica'
         self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
         self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
         self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
-        newdict = parse_manual_ica_qa(self)
-        self.ica_comps_toremove = np.asarray(newdict[self.meg_rest_raw.basename]).astype(int)
+        self.ica_comps_toremove = comps
         logstring = 'Components to reject: ' + str(self.ica_comps_toremove)
         logger.info(logstring)
         
@@ -1445,9 +1445,20 @@ def find_cal_files(args=None, bids_path=None):
     raise(ValueError('''Could not find the ct_sparse and sss_cal files, please
                      provide these as a commandline alt options'''))
         
-        
+# get final ICA components after manual QA from logfile
+def get_comps(logfile):
+    components=[]
+    '''Loop over lines in review log'''
+    with open(logfile) as f:
+        logcontents = f.readlines()
+    for line in logcontents:
+        tmp=line.split(':')
+        if ' Final ICA components after manual QA' in tmp:
+            # Grab the last element, strip whitespace/newlines, then parse it
+            raw = tmp[-1].strip()           
+            components = ast.literal_eval(raw) 
+    return components        
     
-
 # hidden testing functions
 def load_test_data(**kwargs):
     os.environ['n_jobs']='6'
@@ -1511,9 +1522,30 @@ def process_subject(subject, args):
             do_dics=args.do_dics)
     proc.do_proc_allsteps()
     
-def process_subject_up_to_icaqa(subject, args):
-    logger = get_subj_logger(subject, args.session, args.rest_tag, args.run, log_dir)
-    logger.info('Initializing structure')
+def process_subject_up_to_icaqa_manual(subject, args):
+    #logger = get_subj_logger(subject, args.session, args.rest_tag, args.run, log_dir)
+    #logger.info('Initializing structure')
+    proc = process(subject=subject, 
+            bids_root=args.bids_root, 
+            deriv_root=None,
+            subjects_dir=None,
+            rest_tagname=args.rest_tag,
+            emptyroom_tagname=args.emptyroom_tag, 
+            session=args.session, 
+            mains=float(args.mains),
+            run=args.run,
+            t1_override=None,
+            megin_ignore=args.megin_ignore,
+            fs_ave_fids=args.fs_ave_fids,
+            do_dics=args.do_dics
+            )
+    proc.load_data()
+    proc.vendor_prep(megin_ignore=proc._megin_ignore)
+    proc.do_ica() 
+    
+def process_subject_up_to_icaqa_megnet(subject, args):
+    #logger = get_subj_logger(subject, args.session, args.rest_tag, args.run, log_dir)
+    #logger.info('Initializing structure')
     proc = process(subject=subject, 
             bids_root=args.bids_root, 
             deriv_root=None,
@@ -1531,11 +1563,11 @@ def process_subject_up_to_icaqa(subject, args):
     proc.load_data()
     proc.vendor_prep(megin_ignore=proc._megin_ignore)
     proc.do_ica()
-    proc.prep_ica_qa()    
+    proc.do_classify_ica()  
     
 def process_subject_after_icaqa(subject, args):
-    logger = get_subj_logger(subject, args.session,args.rest_tag, args.run, log_dir)
-    logger.info('Initializing structure')
+    #logger = get_subj_logger(subject, args.session,args.rest_tag, args.run, log_dir)
+    #logger.info('Initializing structure')
     proc = process(subject=subject, 
             bids_root=args.bids_root, 
             deriv_root=None,
@@ -1691,7 +1723,12 @@ def return_args():
                         action='store_true',
                         default=0
                         )
-    qaargs.add_argument('-process_manual_ica_qa',
+    qaargs.add_argument('-ica_megnet_qa_prep',
+                        help='''if flag is present, stop after ICA megnet for manual QA''',
+                        action='store_true',
+                        default=0
+                        )
+    qaargs.add_argument('-process_post_manual_ica_qa',
                         help='''If flag is present, pick up analysis after performing manual ICA QA''',
                         action='store_true',
                         default=0
@@ -1832,16 +1869,15 @@ def main():
         
         if args.ica_manual_qa_prep:
             
-            ica_qa_dir = f'{bids_root}/derivatives/ENIGMA_MEG_QA'
-            if not os.path.isdir(ica_qa_dir):
-                os.makedirs(ica_qa_dir)
-            if not os.path.isdir(os.path.join(ica_qa_dir,'sub-'+args.subject)):
-                os.makedirs(os.path.join(ica_qa_dir,'sub-'+args.subject))
-            if not os.path.isdir(os.path.join(ica_qa_dir,'sub-'+args.subject+'/ses-'+args.session)):
-                os.makedirs(os.path.join(ica_qa_dir,'sub-'+args.subject+'/ses-'+args.session))
-            process_subject_up_to_icaqa(args.subject, args)
+            print('Processing subject only up to ICA for manual QA')
+            process_subject_up_to_icaqa_manual(args.subject, args)
+        
+        elif args.ica_megnet_qa_prep:
+            
+            print('Performing processing through MegNet then halting for QA')
+            process_subject_up_to_icaqa_megnet(args.subject, args)
 
-        elif args.process_manual_ica_qa:
+        elif args.process_post_manual_ica_qa:
             process_subject_after_icaqa(args.subject, args)
 
         else:
@@ -1918,8 +1954,11 @@ def main():
                 if (args.ica_manual_qa_prep == 1):
                     process_subj.vendor_prep()
                     process_subj.do_ica()
-                    process_subj.prep_ica_qa()
-                elif(args.process_manual_ica_qa == 1):
+                if (args.ica_megnet_qa_prep == 1):
+                    process_subj.vendor_prep()
+                    process_subj.do_ica()
+                    process_subj.do_classify_ica()
+                elif(args.process_post_manual_ica_qa == 1):
                     process_subj.vendor_prep()
                     process_subj.set_ica_comps_manual()
                     process_subj.do_preproc()
