@@ -11,6 +11,7 @@ warnings.simplefilter(action='ignore', category=DeprecationWarning)
 import os
 import os.path as op
 import sys
+import random
 import mne
 import re
 import glob
@@ -131,6 +132,7 @@ class process():
             check_paths=True,
             do_dics=False,
             csv_info=None,
+            random_seed=None,
             ):
         
 # =============================================================================
@@ -198,6 +200,10 @@ class process():
             self._n_jobs = int(os.environ['n_jobs'])
         except:
             self._n_jobs = 1
+
+        if random_seed is None:
+            random_seed = os.environ.get('ENIGMA_RANDOM_SEED', 0)
+        self.random_seed = int(random_seed)
         
         self.do_dics = do_dics
             
@@ -628,11 +634,14 @@ class process():
     @log
     def do_ica(self):           # perform the 20 component ICA using functions from megnet
         from MEGnet.prep_inputs.ICA import main as ICA
+        random.seed(self.random_seed)
+        np.random.seed(self.random_seed)
         ica_basename = self.meg_rest_raw.basename + '_ica'
         bad_channels = [i for i in self.bad_channels if i in self.raw_rest.info['ch_names']] #Prevent drop channels from erroring
         ICA(self.raw_rest,mains_freq=float(self.proc_vars['mains']), 
             save_preproc=True, save_ica=True, results_dir=self.deriv_path.directory, 
-            outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels)  
+            outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels,
+            seedval=self.random_seed)
         self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
         self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
         self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
@@ -643,6 +652,8 @@ class process():
         import MEGnet
         from MEGnet.megnet_utilities import fPredictChunkAndVoting_parrallel
         from tensorflow import keras
+        if hasattr(keras, 'utils') and hasattr(keras.utils, 'set_random_seed'):
+            keras.utils.set_random_seed(self.random_seed)
         model_path = op.join(MEGnet.__path__[0] ,  'model_v2')
         # This is set to use CPU in initial import
         kModel=keras.models.load_model(model_path)
