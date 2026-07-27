@@ -645,7 +645,7 @@ class process():
         from tensorflow import keras
         model_path = op.join(MEGnet.__path__[0] ,  'model_v2')
         # This is set to use CPU in initial import
-        kModel=keras.models.load_model(model_path)
+        kModel=keras.models.load_model(model_path, compile=False)
         arrSP_fnames = [op.join(self.fnames.ica_folder, f'component{i}.mat') for i in range(1,21)]
         arrTS = loadmat(op.join(self.fnames.ica_folder, 'ICATimeSeries.mat'))['arrICATimeSeries'].T
         arrSP = np.stack([loadmat(i)['array'] for i in arrSP_fnames])
