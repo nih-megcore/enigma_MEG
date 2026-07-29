@@ -41,10 +41,12 @@ install_system_requirements:
 test:
 	($(CONDA_ACTIVATE) enigma_meg_test ; cd enigma_MEG; pytest -vv --report-log=/tmp/enigma_MEG_test_logfile.txt )  
 
+test_multivendor:
+	($(CONDA_ACTIVATE) enigma_meg_test ; ENIGMA_TEST_DIR=$(test_datadir) NUMBA_DISABLE_JIT=1 MPLCONFIGDIR=/tmp/enigma-multivendor-mpl XDG_CACHE_HOME=/tmp/enigma-multivendor-cache pytest -vv enigmeg/test/test_multivendor.py --report-log=/tmp/enigma_MEG_multivendor_test_logfile.txt )
+
 test_headless:
 	($(CONDA_ACTIVATE) enigma_meg_test ; cd enigma_MEG; xvfb-run -a pytest -vv --report-log=/tmp/enigma_MEG_test_logfile.txt )
 
 
 test_iterate_fs:
 	($(CONDA_ACTIVATE) enigma_meg_test ; cd enigma_MEG; pytest -vv --report-log=./test_logfile.txt )  #xvfb-run -a pytest -s )
-
