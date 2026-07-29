@@ -23,6 +23,8 @@ install_test:
 	conda env remove -n enigma_meg_test -y
 	mamba create --override-channels --channel=conda-forge --name=enigma_meg_test python mne  pip -y
 	($(CONDA_ACTIVATE) enigma_meg_test ; pip install -e .[testing]; pip install pytest pytest-reportlog )
+	# Download the MEGnet classifier weights from Hugging Face.
+	($(CONDA_ACTIVATE) enigma_meg_test ; megnet_init )
 	git submodule init
 	git pull --recurse-submodules
 
