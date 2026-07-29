@@ -472,8 +472,9 @@ class process():
                     all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat #This may be redundant to below
             else:
                 all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat 
-            # remove duplicates
-            all_bad = list(set(all_bad))
+            # remove duplicates without making channel processing depend on
+            # Python's randomized hash order
+            all_bad = sorted(set(all_bad))
                 
             # mark bad/flat channels as such in datasets
             self.bad_channels = all_bad
@@ -529,6 +530,17 @@ class process():
 # =============================================================================
 #       Preprocessing
 # =============================================================================
+
+    def _set_ica_fnames(self):
+        """Set MEGnet output paths, including its seed-specific ICA filename."""
+        ica_basename = self.meg_rest_raw.basename + '_ica'
+        self.fnames.ica_folder = self.deriv_path.directory / ica_basename
+        self.fnames.ica = self.fnames.ica_folder / (
+            f'{ica_basename}_{self.random_seed}-ica.fif'
+            )
+        self.fnames.ica_megnet_raw = self.fnames.ica_folder / (
+            ica_basename + '_250srate_meg.fif'
+            )
 
     @log
     def _preproc(self,          # resampling, mains notch filtering, bandpass filtering
@@ -636,9 +648,7 @@ class process():
             save_preproc=True, save_ica=True, results_dir=self.deriv_path.directory, 
             outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels,
             seedval=self.random_seed)
-        self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
-        self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
-        self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
+        self._set_ica_fnames()
 
     @log           
     def do_classify_ica(self):  # use the MEGNET model to automatically classify ICA components as artifactual
@@ -673,10 +683,7 @@ class process():
         
         logfilename = op.join(log_dir, logfilename)
         comps = get_comps(logfilename)
-        ica_basename = self.meg_rest_raw.basename + '_ica'
-        self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
-        self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
-        self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
+        self._set_ica_fnames()
         self.ica_comps_toremove = comps
         logstring = 'Components to reject: ' + str(self.ica_comps_toremove)
         logger.info(logstring)

@@ -213,6 +213,7 @@ def test_do_ica_passes_configured_random_seed(monkeypatch, tmp_path):
     proc.do_ica()
 
     assert captured["seedval"] == 8675309
+    assert proc.fnames.ica.name == "synthetic_ica_8675309-ica.fif"
 
 
 @pytest.mark.parametrize(
