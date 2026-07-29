@@ -131,6 +131,7 @@ class process():
             check_paths=True,
             do_dics=False,
             csv_info=None,
+            random_seed=0,
             ):
         
 # =============================================================================
@@ -200,6 +201,7 @@ class process():
             self._n_jobs = 1
         
         self.do_dics = do_dics
+        self.random_seed = random_seed
             
 # =============================================================================
 #             Configure paths and filenames
@@ -470,8 +472,9 @@ class process():
                     all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat #This may be redundant to below
             else:
                 all_bad = self.raw_rest.info['bads'] + rest_bad + rest_flat 
-            # remove duplicates
-            all_bad = list(set(all_bad))
+            # remove duplicates without making channel processing depend on
+            # Python's randomized hash order
+            all_bad = sorted(set(all_bad))
                 
             # mark bad/flat channels as such in datasets
             self.bad_channels = all_bad
@@ -527,6 +530,17 @@ class process():
 # =============================================================================
 #       Preprocessing
 # =============================================================================
+
+    def _set_ica_fnames(self):
+        """Set MEGnet output paths, including its seed-specific ICA filename."""
+        ica_basename = self.meg_rest_raw.basename + '_ica'
+        self.fnames.ica_folder = self.deriv_path.directory / ica_basename
+        self.fnames.ica = self.fnames.ica_folder / (
+            f'{ica_basename}_{self.random_seed}-ica.fif'
+            )
+        self.fnames.ica_megnet_raw = self.fnames.ica_folder / (
+            ica_basename + '_250srate_meg.fif'
+            )
 
     @log
     def _preproc(self,          # resampling, mains notch filtering, bandpass filtering
@@ -632,10 +646,9 @@ class process():
         bad_channels = [i for i in self.bad_channels if i in self.raw_rest.info['ch_names']] #Prevent drop channels from erroring
         ICA(self.raw_rest,mains_freq=float(self.proc_vars['mains']), 
             save_preproc=True, save_ica=True, results_dir=self.deriv_path.directory, 
-            outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels)  
-        self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
-        self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
-        self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
+            outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels,
+            seedval=self.random_seed)
+        self._set_ica_fnames()
 
     @log           
     def do_classify_ica(self):  # use the MEGNET model to automatically classify ICA components as artifactual
@@ -645,7 +658,7 @@ class process():
         from tensorflow import keras
         model_path = op.join(MEGnet.__path__[0] ,  'model_v2')
         # This is set to use CPU in initial import
-        kModel=keras.models.load_model(model_path)
+        kModel=keras.models.load_model(model_path, compile=False)
         arrSP_fnames = [op.join(self.fnames.ica_folder, f'component{i}.mat') for i in range(1,21)]
         arrTS = loadmat(op.join(self.fnames.ica_folder, 'ICATimeSeries.mat'))['arrICATimeSeries'].T
         arrSP = np.stack([loadmat(i)['array'] for i in arrSP_fnames])
@@ -670,10 +683,7 @@ class process():
         
         logfilename = op.join(log_dir, logfilename)
         comps = get_comps(logfilename)
-        ica_basename = self.meg_rest_raw.basename + '_ica'
-        self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
-        self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
-        self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
+        self._set_ica_fnames()
         self.ica_comps_toremove = comps
         logstring = 'Components to reject: ' + str(self.ica_comps_toremove)
         logger.info(logstring)
