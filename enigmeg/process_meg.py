@@ -131,6 +131,7 @@ class process():
             check_paths=True,
             do_dics=False,
             csv_info=None,
+            random_seed=0,
             ):
         
 # =============================================================================
@@ -200,6 +201,7 @@ class process():
             self._n_jobs = 1
         
         self.do_dics = do_dics
+        self.random_seed = random_seed
             
 # =============================================================================
 #             Configure paths and filenames
@@ -632,7 +634,8 @@ class process():
         bad_channels = [i for i in self.bad_channels if i in self.raw_rest.info['ch_names']] #Prevent drop channels from erroring
         ICA(self.raw_rest,mains_freq=float(self.proc_vars['mains']), 
             save_preproc=True, save_ica=True, results_dir=self.deriv_path.directory, 
-            outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels)  
+            outbasename=ica_basename, do_assess_bads=False, bad_channels=bad_channels,
+            seedval=self.random_seed)
         self.fnames.ica_folder = self.deriv_path.directory  / ica_basename
         self.fnames.ica = self.fnames.ica_folder / (ica_basename + '_0-ica.fif')
         self.fnames.ica_megnet_raw =self.fnames.ica_folder / (ica_basename + '_250srate_meg.fif')
