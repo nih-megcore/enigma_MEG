@@ -1,11 +1,10 @@
-name: enigma_meg
+name: enigma_meg_test
 channels:
-  - conda-forge
   - defaults
+  - conda-forge
 dependencies:
   - python[version='<3.12']
   - mne=1.5
+  - pip
   - numba[version='<0.60']
-  - pyvistaqt
-  - pip:
-    - git+https://github.com/jstout211/enigma_MEG.git
+prefix: /home/jstout/minicondaV4/envs/enigma_meg_test
