@@ -653,12 +653,9 @@ class process():
     @log           
     def do_classify_ica(self):  # use the MEGNET model to automatically classify ICA components as artifactual
         from scipy.io import loadmat
-        import MEGnet
+        from MEGnet.prep_inputs.ICA import load_keras_model
         from MEGnet.megnet_utilities import fPredictChunkAndVoting_parrallel
-        from tensorflow import keras
-        model_path = op.join(MEGnet.__path__[0] ,  'model_v2')
-        # This is set to use CPU in initial import
-        kModel=keras.models.load_model(model_path, compile=False)
+        kModel = load_keras_model()
         arrSP_fnames = [op.join(self.fnames.ica_folder, f'component{i}.mat') for i in range(1,21)]
         arrTS = loadmat(op.join(self.fnames.ica_folder, 'ICATimeSeries.mat'))['arrICATimeSeries'].T
         arrSP = np.stack([loadmat(i)['array'] for i in arrSP_fnames])
