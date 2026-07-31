@@ -1,13 +1,14 @@
-## Enigma MEG singularity
-!!Enter URL here!!
+# Enigma MEG singularity
+## Download container
+`wget https://megcore.nih.gov/MEG/enigma_meg_v1.1.0.sif`
 
 ## Running container
 Run the following substituting in your bids root folders in the variables below<br><br>
-`singularity run -B ${FREESURFER_HOME}/license.txt:/opt/freesurfer-7.4.1/license.txt -B ${BIDS_ROOT}:${BIDS_ROOT} enigma_meg.sif` <br><br>
+`singularity run -B ${FREESURFER_HOME}/license.txt:/opt/freesurfer-7.4.1/license.txt -B ${BIDS_ROOT}:${BIDS_ROOT} enigma_meg_v1.1.0.sif` <br><br>
 Results in the container environment<br>
 NOTE: Your home folder and your BIDS_ROOT are writeable from the container env <br>
 ```
-USER@COMPUTER:~/src/enigma_MEG/container$ singularity run enigma_meg.sif 
+USER@COMPUTER:~/src/enigma_MEG/container$ singularity run enigma_meg_v1.1.0.sif 
 bash: /fast/freesurfer/SetUpFreeSurfer.sh: No such file or directory
 bash: /opt/MNE_C/MNE-2.7.0-3106-Linux-x86_64/bin/mne_setup_sh: No such file or directory
 Apptainer> 
