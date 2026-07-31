@@ -406,7 +406,7 @@ dependencies:
   - uri-template=1.3.0=pyhd8ed1ab_1
   - urllib3=2.7.0=pyhd8ed1ab_0
   - utfcpp=4.09=ha770c72_0
-  - viskores=1.1.1=cuda13.0_hd6b4012_1
+  - viskores
   - vtk=9.6.2=py311hbfd8129_6
   - vtk-base=9.6.2=py311hb6f4c19_6
   - vtk-io-ffmpeg=9.6.2=py311h44642a9_6

@@ -114,6 +114,11 @@ conda config --system --prepend channels conda-forge
 conda config --set channel_priority strict
 conda config --system --set auto_update_conda false
 conda config --system --set show_channel_urls true
+
+# Manual Override to prevent issues 07/31/26
+export CONDA_OVERRIDE_GLIBC=2.35
+export CONDA_OVERRIDE_CUDA=13.3
+
 # Enable `conda activate`
 conda init bash
 conda env create  --name enigma_meg --file enigma_meg.yml
