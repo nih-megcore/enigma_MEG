@@ -50,4 +50,37 @@ neurodocker generate singularity \
 ## Build Singularity container
 `sudo singularity build enigma_meg.sif enigma_meg.def`
 
+## TESTING for container
+```
+  SIF=/tmp/enigma_MEG/container/enigma_meg_v1.1.0.sif
+  TEST_ROOT=/data/NIGHTLY_TESTDATA
+  FS_LICENSE=/fast/freesurfer/license.txt
+  RESULTS=/tmp/SING_enigma_meg_testing
+
+  mkdir -p "$RESULTS"
+
+  singularity exec \
+    --cleanenv \
+    --pwd /tmp \
+    --bind "$TEST_ROOT:/testdata" \
+    --bind "$FS_LICENSE:/opt/freesurfer-7.4.1/license.txt:ro" \
+    --bind "$RESULTS:/test-results" \
+    --env ENIGMA_TEST_DIR=/testdata \
+    --env NUMBA_DISABLE_JIT=1 \
+    --env MPLCONFIGDIR=/tmp/enigma-multivendor-mpl \
+    --env XDG_CACHE_HOME=/tmp/enigma-multivendor-cache \
+    "$SIF" \
+    /condastartup.sh \
+    python -m pytest -vv \
+      --pyargs enigmeg.test.test_multivendor \
+      --junitxml=/test-results/multivendor.xml
+
+```
+
+
+
+
+
+
+
 
