@@ -9,3 +9,4 @@ enigmeg/test_data
 .ipynb_checkpoints
 htmlcov/*
 build
+container/enigma_meg_v1.1.0.sif
