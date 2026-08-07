@@ -7,6 +7,8 @@
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pyparsing")
+warnings.filterwarnings("ignore", message=".*deprecated.*")
 
 import os
 import os.path as op
@@ -1773,7 +1775,7 @@ def return_args():
                         action='store_true',
                         default=0
                         )
-    qaargs.add_argument('-process_redomegnet_pluspost',
+    qaargs.add_argument('-process_redo_icaclass_postplus',
                         help='''If flag is present, redo analysis from ICA classification to spectral outputs''',
                         action='store_true',
                         default=0
