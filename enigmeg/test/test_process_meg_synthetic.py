@@ -216,6 +216,45 @@ def test_do_ica_passes_configured_random_seed(monkeypatch, tmp_path):
     assert proc.fnames.ica.name == "synthetic_ica_8675309-ica.fif"
 
 
+def test_initialize_fnames_restores_existing_ica_folder(tmp_path):
+    proc = process_meg.process.__new__(process_meg.process)
+    proc.subject = "01"
+    proc.run = "01"
+    proc.random_seed = 8675309
+    proc.do_dics = False
+    proc._t1_override = None
+    proc.subjects_dir = tmp_path / "derivatives" / "freesurfer" / "subjects"
+    proc.bids_path = BIDSPath(
+        root=tmp_path,
+        subject=proc.subject,
+        session="01",
+        check=False,
+    )
+    proc.meg_rest_raw = proc.bids_path.copy().update(
+        task="rest",
+        run=proc.run,
+        datatype="meg",
+        suffix="meg",
+        extension=".fif",
+    )
+    proc.deriv_path = proc.meg_rest_raw.copy().update(
+        root=tmp_path / "derivatives" / "ENIGMA_MEG",
+        check=False,
+    )
+    proc.deriv_path.directory.mkdir(parents=True)
+    proc.rest_derivpath = proc.deriv_path.copy()
+
+    ica_basename = f"{proc.meg_rest_raw.basename}_ica"
+    ica_folder = proc.deriv_path.directory / ica_basename
+    ica_folder.mkdir()
+
+    fnames = proc.initialize_fnames("rest", None)
+
+    assert fnames.ica_folder == ica_folder
+    assert fnames.ica == ica_folder / f"{ica_basename}_8675309-ica.fif"
+    assert fnames.ica_megnet_raw == ica_folder / f"{ica_basename}_250srate_meg.fif"
+
+
 @pytest.mark.parametrize(
     ("bands", "expected"),
     [
