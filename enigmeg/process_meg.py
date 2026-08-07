@@ -1605,6 +1605,36 @@ def process_subject_after_icaqa(subject, args):
     proc.do_spectral_parameterization()
     proc.do_mri_segstats()
     proc.cleanup()
+
+def process_redo_icaclass_postplus(subject, args):
+    #logger = get_subj_logger(subject, args.session,args.rest_tag, args.run, log_dir)
+    #logger.info('Initializing structure')
+    proc = process(subject=subject, 
+            bids_root=args.bids_root, 
+            deriv_root=None,
+            subjects_dir=None,
+            rest_tagname=args.rest_tag,
+            emptyroom_tagname=args.emptyroom_tag, 
+            session=args.session, 
+            mains=float(args.mains),
+            run=args.run,
+            t1_override=None,
+            megin_ignore=args.megin_ignore,
+            fs_ave_fids=args.fs_ave_fids,
+            do_dics=args.do_dics
+            )
+    proc.load_data()
+    proc.do_classify_ica()
+    proc.do_preproc()
+    proc.do_clean_ica()
+    proc.do_proc_epochs()
+    proc.proc_mri(t1_override=proc._t1_override)
+    proc.do_beamformer()
+    proc.do_make_aparc_sub()
+    proc.do_label_psds()
+    proc.do_spectral_parameterization()
+    proc.do_mri_segstats()
+    proc.cleanup()
         
 def parse_manual_ica_qa(self):
     logfile_path = self.bids_root + '/derivatives/ENIGMA_MEG_QA/ica_QA_logfile.txt'
@@ -1743,6 +1773,11 @@ def return_args():
                         action='store_true',
                         default=0
                         )
+    qaargs.add_argument('-process_redomegnet_pluspost',
+                        help='''If flag is present, redo analysis from ICA classification to spectral outputs''',
+                        action='store_true',
+                        default=0
+                        )                        
     parser.add_argument('-remove_old',
                         help='''If flag is present, remove any files from a prior run (excepting freesurfer data). ''',
                         action='store_true',
@@ -1889,6 +1924,9 @@ def main():
 
         elif args.process_post_manual_ica_qa:
             process_subject_after_icaqa(args.subject, args)
+        
+        elif args.process_redo_icaclass_postplus:
+            process_redo_icaclass_postplus(args.subject, args)
 
         else:
             process_subject(args.subject, args)  # process the single specified subject
@@ -1980,6 +2018,19 @@ def main():
                     process_subj.do_label_psds()
                     process_subj.do_spectral_parameterization()
                     process_subj.do_mri_segstats()
+                elif(args.process_redo_icaclass_postplus ==1):
+                    process_subj.load_data()
+                    process_subj.do_classify_ica()
+                    process_subj.do_preproc()
+                    process_subj.do_clean_ica()
+                    process_subj.do_proc_epochs()
+                    process_subj.proc_mri()
+                    process_subj.do_beamformer()
+                    process_subj.do_make_aparc_sub()
+                    process_subj.do_label_psds()
+                    process_subj.do_spectral_parameterization()
+                    process_subj.do_mri_segstats()
+                    process_subj.cleanup()
                     
                 else:    
                     process_subj.do_proc_allsteps()
